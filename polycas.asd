@@ -2,7 +2,7 @@
 
 (defsystem "polycas"
   :description "A small computer algebra system in portable Common Lisp."
-  :version "0.1.0"
+  :version "0.2.0"
   :author "Aryan Vohra"
   :license "MIT"
   :serial t
@@ -12,7 +12,8 @@
                              (:file "expr")
                              (:file "simplify")
                              (:file "parse")
-                             (:file "print"))))
+                             (:file "print")
+                             (:file "calculus"))))
   :in-order-to ((test-op (test-op "polycas/tests"))))
 
 (defsystem "polycas/tests"
@@ -21,7 +22,8 @@
   :components ((:module "tests"
                 :serial t
                 :components ((:file "harness")
-                             (:file "test-core"))))
+                             (:file "test-core")
+                             (:file "test-calculus"))))
   :perform (test-op (o c)
              (unless (uiop:symbol-call '#:polycas-tests '#:run-all)
                (error "polycas tests failed"))))

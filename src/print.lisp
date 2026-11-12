@@ -5,12 +5,37 @@
 
 (in-package #:polycas)
 
-(defun term-degree (e)
-  "Total degree of a term, used only to order sums for display."
-  (cond ((var-p e) 1)
-        ((power-p e) (if (and (integerp (third e)) (var-p (second e))) (third e) 0))
-        ((product-p e) (reduce #'+ (mapcar #'term-degree (cdr e))))
-        (t 0)))
+;;; Sums are displayed in "polynomial order": higher total degree first and,
+;;; within a degree, lexicographically by variable name (x^2, x*y, y^2),
+;;; with other terms before the constant. Only display is affected.
+
+(defun display-monomial (e)
+  "Alist (variable-name . exponent) of the polynomial part of term E."
+  (let ((acc '()))
+    (labels ((walk (f)
+               (cond ((var-p f) (push (cons (symbol-name f) 1) acc))
+                     ((and (power-p f) (var-p (second f)) (integerp (third f)) (plusp (third f)))
+                      (push (cons (symbol-name (second f)) (third f)) acc))
+                     ((product-p f) (mapc #'walk (cdr f))))))
+      (walk e))
+    (sort acc #'string< :key #'car)))
+
+(defun display-before-p (a b)
+  "True when sum term A should be printed before term B."
+  (cond ((numberp a) nil)
+        ((numberp b) t)
+        (t (let* ((ma (display-monomial a)) (mb (display-monomial b))
+                  (da (reduce #'+ ma :key #'cdr)) (db (reduce #'+ mb :key #'cdr)))
+             (if (/= da db)
+                 (> da db)
+                 ;; lexicographic comparison of exponent vectors
+                 (loop for name in (sort (remove-duplicates (mapcar #'car (append ma mb))
+                                                            :test #'string=)
+                                         #'string<)
+                       for ea = (or (cdr (assoc name ma :test #'string=)) 0)
+                       for eb = (or (cdr (assoc name mb :test #'string=)) 0)
+                       when (/= ea eb) return (> ea eb)
+                       finally (return nil)))))))
 
 (defun negative-term-p (e)
   (or (and (numberp e) (minusp e))
@@ -48,7 +73,7 @@ Precedences: sum 1, product/quotient 2, power 3, atom 4."
         (t (error "cannot print ~S" e))))
 
 (defun fmt-sum (e)
-  (let ((terms (stable-sort (copy-list (cdr e)) #'> :key #'term-degree))
+  (let ((terms (stable-sort (copy-list (cdr e)) #'display-before-p))
         (out (make-string-output-stream)))
     (loop for term in terms
           for first = t then nil
